@@ -20,7 +20,7 @@ export const uploadCourse = CatchAsyncError(async (req:Request, res: Response, n
             const myCloud = await cloudinary.v2.uploader.upload(thumbnail,{
                 folder:"courses"
             })
-            data.thumnail ={
+            data.thumbnail ={
                 public_id:myCloud.public_id,
                 url:myCloud.secure_url
             }
