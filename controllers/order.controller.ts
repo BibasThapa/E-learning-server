@@ -29,10 +29,14 @@ export const createOrder = CatchAsyncError(async(req:Request, res:Response, next
         }
         const user = await userModel.findById(req.user?._id);
         const courseExistInUser = user?.courses.some((course:any)=> course._id.toString() === courseId);
+      console.log("testing",courseExistInUser)
+
         if(courseExistInUser){
             return next(new ErrorHandler("You have already purchased this course", 400));
         }
         const course = await CourseModel.findById(courseId);
+      console.log("course",course)
+
         if(!course){
             return next(new ErrorHandler("Course not found",404))
         }
@@ -84,6 +88,7 @@ export const createOrder = CatchAsyncError(async(req:Request, res:Response, next
           
 
     } catch (error:any) {
+      console.log("This is error",error)
         return next(new ErrorHandler(error.message,500))
     }
 })
@@ -106,7 +111,7 @@ export const newPayment = CatchAsyncError(async(req:Request, res:Response, next:
   try {
     const myPayment = await stripe.paymentIntents.create({
       amount: req.body.amount,
-      currency:"NPR",
+      currency:"usd",
       metadata:{
         company:"E-Learning"
       }, automatic_payment_methods:{

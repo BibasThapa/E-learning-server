@@ -9,7 +9,7 @@ interface DocumentWithCreatedAt extends Document {
 export interface IOrder extends DocumentWithCreatedAt {
     courseId: string;
     userId: string;
-    payment_info: object;
+    payment_info: any;
 }
 
 const orderSchema = new Schema<IOrder>({
@@ -23,7 +23,7 @@ const orderSchema = new Schema<IOrder>({
     },
     payment_info: {
         type: Object,
-        // required: true // Uncomment if you want to enforce this
+        
     },
 }, { timestamps: true }); // Automatically adds createdAt and updatedAt
 
