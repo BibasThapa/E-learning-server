@@ -11,6 +11,7 @@ import sendMail from "../utils/sendMail";
 import mongoose from 'mongoose';
 import NotificationModel from "../models/notificationModel";
 import axios from "axios";
+import userModel from "../models/user.models"
 
 export const uploadCourse = CatchAsyncError(async (req:Request, res: Response, next: NextFunction)=>{
     try{
@@ -32,36 +33,45 @@ export const uploadCourse = CatchAsyncError(async (req:Request, res: Response, n
 })
 
 
-export const editCourse = CatchAsyncError(async(req:Request, res:Response, next:NextFunction)=>{
+export const editCourse = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
     try {
         const data = req.body;
-        const  thumbnail = data.thumbnail;
-
-        if(thumbnail){
-            await cloudinary.v2.uploader.destroy(thumbnail.public_id);
-            const myCloud = await cloudinary.v2.uploader.upload(thumbnail,{
-                folder:"courses"
-            });
-            data.thumbnail ={
-                public_id: myCloud.public_id,
-                url:myCloud.secure_url
-            }
-        }
+        const thumbnail = data.thumbnail;
         const courseId = req.params.id;
-        const course = await CourseModel.findByIdAndUpdate(courseId,{
-            $set:data},
-            {new: true
+        const courseData = await CourseModel.findById(courseId) as any;
 
-        })
+        
+        if (thumbnail && typeof thumbnail === 'string' && !thumbnail.startsWith("https")) {
+            
+            await cloudinary.v2.uploader.destroy(courseData.thumbnail.public_id);
+            const myCloud = await cloudinary.v2.uploader.upload(thumbnail, {
+                folder: "courses",
+            });
+            data.thumbnail = {
+                public_id: myCloud.public_id,
+                url: myCloud.secure_url,
+            };
+        } else if (thumbnail && typeof thumbnail === 'string' && thumbnail.startsWith("https")) {
+            // If the thumbnail is a valid URL, keep the existing thumbnail data
+            data.thumbnail = {
+                public_id: courseData?.thumbnail.public_id,
+                url: courseData?.thumbnail.url,
+            };
+        }
+
+        const course = await CourseModel.findByIdAndUpdate(courseId, {
+            $set: data,
+        }, { new: true });
+
         res.status(201).json({
-            success:true,
+            success: true,
             course,
-        })
+        });
 
-    } catch (error:any) {
-        return  next(new ErrorHandler(error.message, 500))
+    } catch (error: any) {
+        return next(new ErrorHandler(error.message, 500));
     }
-})
+});
 
 export const getSingleCourse = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -103,9 +113,14 @@ export const getAllCourses = CatchAsyncError(async (req: Request, res: Response,
 
 export const getCourseByUser = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const userCourseList = req.user?.courses;
+        const userId=req.user?._id
+        const currentUser= await userModel.findById(userId)
+        const userCourseList = currentUser?.courses;
         const courseId = req.params.id;
-        const courseExists = userCourseList?.find((course: any) => course._id.toString() === courseId);
+        console.log("userCourseList",currentUser);
+        console.log("courseId",courseId)
+
+        const courseExists = userCourseList?.find((course: any) => course.courseId === courseId);
         if (!courseExists) {
             return next(new ErrorHandler("You are not eligible to access this course", 400));
         }

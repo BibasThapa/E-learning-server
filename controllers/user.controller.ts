@@ -194,6 +194,20 @@ export const getUserInfo = CatchAsyncError(
         }
     }
 );
+
+export const getUserInformationById = CatchAsyncError(
+    async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const userId = req.body.data as string;
+            console.log("THis is user request",req.body);
+            getUserById(userId, res);
+
+        } catch (error: any) {
+            return next(new ErrorHandler(error.message, 400))
+        }
+    }
+);
+
 interface ISocialAuthBody {
     email: string,
     name: string,
