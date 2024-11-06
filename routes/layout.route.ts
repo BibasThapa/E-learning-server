@@ -4,7 +4,7 @@ import express from "express"
 
 const layoutRouter = express.Router();
 layoutRouter.post("/create-layout", isAuthenticated, authorizeRoles("admin"), createLayout);
-layoutRouter.post("/edit-layout", isAuthenticated, authorizeRoles("admin"), editLayout);
+layoutRouter.put("/edit-layout", isAuthenticated, authorizeRoles("admin"), editLayout);
 layoutRouter.get("/get-layout/:type",  getLayoutByType);
 
 export default layoutRouter;

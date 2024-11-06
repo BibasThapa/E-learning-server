@@ -1,4 +1,4 @@
-import {NextFunction, Request, Response} from "express"
+import { NextFunction, Request, Response } from "express"
 import { CatchAsyncError } from "../middleware/catchAsyncErrors"
 import ErrorHandler from "../utils/ErrorHandler"
 import cloudinary from "cloudinary"
@@ -13,22 +13,22 @@ import NotificationModel from "../models/notificationModel";
 import axios from "axios";
 import userModel from "../models/user.models"
 
-export const uploadCourse = CatchAsyncError(async (req:Request, res: Response, next: NextFunction)=>{
-    try{
+export const uploadCourse = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+    try {
         const data = req.body;
         const thumbnail = data.thumbnail;
-        if(thumbnail){
-            const myCloud = await cloudinary.v2.uploader.upload(thumbnail,{
-                folder:"courses"
+        if (thumbnail) {
+            const myCloud = await cloudinary.v2.uploader.upload(thumbnail, {
+                folder: "courses"
             })
-            data.thumbnail ={
-                public_id:myCloud.public_id,
-                url:myCloud.secure_url
+            data.thumbnail = {
+                public_id: myCloud.public_id,
+                url: myCloud.secure_url
             }
         }
-        createCourse(data,res,next);
-    } catch (error :any) {
-        return  next(new ErrorHandler(error.message, 500))
+        createCourse(data, res, next);
+    } catch (error: any) {
+        return next(new ErrorHandler(error.message, 500))
     }
 })
 
@@ -40,9 +40,9 @@ export const editCourse = CatchAsyncError(async (req: Request, res: Response, ne
         const courseId = req.params.id;
         const courseData = await CourseModel.findById(courseId) as any;
 
-        
+
         if (thumbnail && typeof thumbnail === 'string' && !thumbnail.startsWith("https")) {
-            
+
             await cloudinary.v2.uploader.destroy(courseData.thumbnail.public_id);
             const myCloud = await cloudinary.v2.uploader.upload(thumbnail, {
                 folder: "courses",
@@ -85,7 +85,7 @@ export const getSingleCourse = CatchAsyncError(async (req: Request, res: Respons
             })
         } else {
             const course = await CourseModel.findById(req.params.id).select("-courseData.videoUrl -courseData.suggestion -courseData.questionns -courseData.links")
-            await redis.set(courseId, JSON.stringify(course),"EX", 604800);
+            await redis.set(courseId, JSON.stringify(course), "EX", 604800);
             res.status(200).json({
                 success: true,
                 course,
@@ -98,14 +98,14 @@ export const getSingleCourse = CatchAsyncError(async (req: Request, res: Respons
 export const getAllCourses = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
     try {
 
-    
-            const courses = await CourseModel.find().select("-courseData.videoUrl -courseData.suggestion -courseData.questionns -courseData.links");
-            await redis.set("allCourses", JSON.stringify(courses));
-            res.status(200).json({
-                success: true,
-                courses,
-            })
-        }
+
+        const courses = await CourseModel.find().select("-courseData.videoUrl -courseData.suggestion -courseData.questionns -courseData.links");
+        await redis.set("allCourses", JSON.stringify(courses));
+        res.status(200).json({
+            success: true,
+            courses,
+        })
+    }
     catch (error: any) {
         return next(new ErrorHandler(error.message, 500))
     }
@@ -113,12 +113,12 @@ export const getAllCourses = CatchAsyncError(async (req: Request, res: Response,
 
 export const getCourseByUser = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const userId=req.user?._id
-        const currentUser= await userModel.findById(userId)
+        const userId = req.user?._id
+        const currentUser = await userModel.findById(userId)
         const userCourseList = currentUser?.courses;
         const courseId = req.params.id;
-        console.log("userCourseList",currentUser);
-        console.log("courseId",courseId)
+        console.log("userCourseList", currentUser);
+        console.log("courseId", courseId)
 
         const courseExists = userCourseList?.find((course: any) => course.courseId === courseId);
         if (!courseExists) {
@@ -197,6 +197,8 @@ export const addAnswer = CatchAsyncError(async (req: Request, res: Response, nex
         const newAnswer: any = {
             user: req.user,
             answer,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
         }
         question.questionReplies.push(newAnswer);
         await course?.save();
@@ -210,6 +212,8 @@ export const addAnswer = CatchAsyncError(async (req: Request, res: Response, nex
             const data = {
                 name: question.user.name,
                 title: courseContent.title,
+                question: question.question, 
+                answer,
             }
             const html = await ejs.renderFile(path.join(__dirname, "../mails/question-reply.ejs"), data);
             try {
@@ -240,40 +244,49 @@ interface IAddReviewData {
 }
 export const addReview = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const userCourseList = req.user?.courses;
         const courseId = req.params.id;
-        const courseExists = userCourseList?.some((course: any) => course._id.toString() === courseId.toString())
-        if (!courseExists) {
-            return next(new ErrorHandler("You are not eligible to acces this course", 400))
+
+        if (!courseId) {
+            return next(new ErrorHandler("Invalid course ID", 400));
         }
+
         const course = await CourseModel.findById(courseId);
+        if (!course) {
+            return next(new ErrorHandler("Course not found", 404));
+        }
+
         const { review, rating } = req.body as IAddReviewData;
         const reviewData: any = {
-            user: req.user,
+            user: req.user,  // or req.user?._id if only ID is needed
             comment: review,
             rating,
-        }
-        course?.reviews.push(reviewData)
-        let avg = 0;
-        course?.reviews.forEach((rev: any) => {
-            avg += rev.rating;
-        })
-        if (course) {
-            course.ratings = avg / course.reviews.length;
-        }
-        await course?.save();
-        const notification = {
+        };
+
+        course.reviews.push(reviewData);
+
+        // Calculate average rating
+        const totalRating = course.reviews.reduce((sum, rev) => sum + rev.rating, 0);
+        course.ratings = totalRating / course.reviews.length;
+
+        await course.save();
+        await redis.set(courseId, JSON.stringify(course), 'EX', 604800);
+
+        await NotificationModel.create({
+            user: req.user?._id,
             title: "New Review Received",
-            message: `${req.user?.name} has given a review in ${course?.name}`
-        }
+            message: `${req.user?.name} has given a review for ${course.name}`,
+        });
+
         res.status(200).json({
             success: true,
             course,
-        })
+        });
     } catch (error: any) {
-        return next(new ErrorHandler(error.message, 500))
+        return next(new ErrorHandler("An error occurred while adding the review", 500));
     }
-})
+});
+
+
 
 interface IAddReviewData {
     comment: string;
@@ -294,13 +307,15 @@ export const addReplyToReview = CatchAsyncError(async (req: Request, res: Respon
         const replyData: any = {
             user: req.user,
             comment,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
         };
         if (!review.commentReplies) {
             review.commentReplies = [];
         }
         review.commentReplies?.push(replyData);
         await course?.save();
-
+        await redis.set(courseId, JSON.stringify(course), 'EX', 604800);
         res.status(200).json({
             success: true,
             course,
@@ -332,30 +347,30 @@ export const generateVideoUrl = CatchAsyncError(async (req: Request, res: Respon
     }
 })
 
-export const getAdminAllCourses= CatchAsyncError(async(req:Request, res:Response, next:NextFunction)=>{
+export const getAdminAllCourses = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
     try {
         getAllCoursesService(res)
-    } catch (error:any) {
+    } catch (error: any) {
         return next(new ErrorHandler(error.message, 400))
     }
 })
 
-export const deleteCourse = CatchAsyncError(async(req:Request, res:Response, next:NextFunction)=>{
+export const deleteCourse = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const {id} = req.params;
+        const { id } = req.params;
         const course = await CourseModel.findById(id);
-        if(!course){
+        if (!course) {
             return next(new ErrorHandler("Course not found", 400))
         }
-        await course.deleteOne({id});
+        await course.deleteOne({ id });
         await redis.del(id);
 
         res.status(200).json({
-            success:true,
-            message:"Course deleted successfully"
+            success: true,
+            message: "Course deleted successfully"
         });
-        
-    } catch (error : any) {
-        return next(new ErrorHandler(error.message,404))
+
+    } catch (error: any) {
+        return next(new ErrorHandler(error.message, 404))
     }
-  })
+})

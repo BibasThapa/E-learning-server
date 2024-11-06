@@ -37,9 +37,10 @@ interface ICourseData extends Document {
     questions: IComment[];
 }
 
-interface ICourse extends DocumentWithCreatedAt {
+ export interface ICourse extends DocumentWithCreatedAt {
     name: string;
     description: string;
+    categories:string[];
     price: number;
     estimatedPrice?: number;
     thumbnail: object;
@@ -51,7 +52,7 @@ interface ICourse extends DocumentWithCreatedAt {
     reviews: IReview[];
     courseData: ICourseData[];
     ratings?: number;
-    purchased?: number;
+    purchased: number;
 }
 
 const reviewSchema = new Schema<IReview>(
@@ -97,6 +98,7 @@ const courseSchema = new Schema<ICourse>(
     {
         name: { type: String, required: true },
         description: { type: String, required: true },
+        categories:{type:[String], required:true},
         price: { type: Number, required: true },
         estimatedPrice: Number,
         thumbnail: {

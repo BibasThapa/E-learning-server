@@ -3,7 +3,7 @@ import { CatchAsyncError } from "../middleware/catchAsyncErrors";
 import ErrorHandler from "../utils/ErrorHandler";
 import OrderModel,{IOrder} from "../models/orderModel";
 import userModel from "../models/user.models";
-import CourseModel from "../models/course.model";
+import CourseModel, { ICourse } from "../models/course.model";
 import path from "path"
 import ejs from "ejs"
 import sendMail from "../utils/sendMail";
@@ -34,7 +34,7 @@ export const createOrder = CatchAsyncError(async(req:Request, res:Response, next
         if(courseExistInUser){
             return next(new ErrorHandler("You have already purchased this course", 400));
         }
-        const course = await CourseModel.findById(courseId);
+        const course: ICourse | null = await CourseModel.findById(courseId);
       console.log("course",course)
 
         if(!course){
@@ -80,7 +80,7 @@ export const createOrder = CatchAsyncError(async(req:Request, res:Response, next
             message:`You have a new order from ${course?.name}`,
           })
 
-          course.purchased ? course.purchased += 1 : course.purchased;
+          course.purchased = course.purchased + 1 ;
           
           await course.save();
           

@@ -21,10 +21,19 @@ export const getAllUsersService = async(res:Response)=> {
     })
 }
 
-export const updateUserRoleService = async(res:Response, id:string, role:string)=>{
-    const user = await userModel.findByIdAndUpdate(id,{role},{new:true});
-    res.status(201).json({
-        success: true,
-        user,
-    })
-}
+export const updateUserRoleService = async (res: Response, email: string, role: string) => {
+  
+    const user = await userModel.findOneAndUpdate({ email: email }, { role }, { new: true });
+    
+    if (user) {
+        res.status(200).json({
+            success: true,
+            user,
+        });
+    } else {
+        res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+};

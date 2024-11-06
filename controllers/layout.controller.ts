@@ -37,27 +37,11 @@ export const createLayout = CatchAsyncError(async(req:Request, res:Response, nex
         }
         if(type==="FAQ"){
             const{faq} =req.body;
-            const faqItems = await Promise.all(
-                faq.map(async(item:any)=>{
-                    return{
-                        question: item.question,
-                        answer: item.answer
-                }
-                })
-            )
-            await LayoutModel.create({type:"FAQ", faq:faqItems})
+            await LayoutModel.create(faq)
         }
         if(type==="Categories"){
             const{categories} = req.body;
-            const categoriesItems = await Promise.all(
-                categories.map(async(item:any)=>{
-                    return{
-                        question: item.question,
-                        answer: item.answer
-                }
-                })
-            )
-            await LayoutModel.create({type:"Categories", categories: categoriesItems})
+           await LayoutModel.create(categories)
         }
         res.status(200).json({
             success:true,
@@ -70,61 +54,86 @@ export const createLayout = CatchAsyncError(async(req:Request, res:Response, nex
 })
 
 
-export const editLayout = CatchAsyncError(async(req:Request, res:Response, next:NextFunction)=>{
+export const editLayout = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const {type} =req.body;
+        const { type } = req.body;
 
-        
-        if(type === "Banner"){
-            const bannerData:any = await LayoutModel.findOne({type: "Banner"})
-            const {image, title, subTitle} =req.body;
-            const data = image.startsWith("https") ? bannerData : await cloudinary.v2.uploader.upload(image, {
-                folder:"layout",
+        if (type === "Banner") {
+            const bannerData: any = await LayoutModel.findOne({ type: "Banner" });
+            const { image, title, subTitle } = req.body;
+
+            const data = image.startsWith("https") ? bannerData.image : await cloudinary.v2.uploader.upload(image, {
+                folder: "layout",
             });
-            const banner ={
-                type:"Banner",
+
+            const banner = {
+                type: "Banner",
                 image: {
-                   public_id: image.startsWith("https") ? bannerData.banner.image.public_id : data?. secure_url,
+                    public_id: image.startsWith("https") ? bannerData.image.public_id : data.public_id,
+                    url: image.startsWith("https") ? bannerData.image.url : data.secure_url,
                 },
-                title, subTitle,
+                title,
+                subTitle,
             };
-            await LayoutModel.findByIdAndUpdate(bannerData._id, {banner})
+
+            await LayoutModel.findByIdAndUpdate(
+                bannerData?._id,
+                banner,
+                { upsert: true, new: true }
+            );
         }
-        if(type==="FAQ"){
-            const{faq} =req.body;
-            const FaqItem = await LayoutModel.findOne({type:"FAQ"})
-            const faqItems = await Promise.all(
-                faq.map(async(item:any)=>{
-                    return{
-                        question: item.question,
-                        answer: item.answer
-                }
-                })
-            )
-            await LayoutModel.findByIdAndUpdate( FaqItem?._id,{type:"FAQ", faq:faqItems})
+
+        if (type === "FAQ") {
+            const { faq } = req.body;
+            let faqData = await LayoutModel.findOne({ type: "FAQ" });
+
+            if (!faqData) {
+                // Create a new FAQ layout if none exists
+                faqData = await LayoutModel.create({ type: "FAQ", faq: [] });
+            }
+
+            const faqItems = await Promise.all(faq.map(async (item: any) => ({
+                question: item.question,
+                answer: item.answer,
+            })));
+
+            await LayoutModel.findByIdAndUpdate(
+                faqData._id,
+                { type: "FAQ", faq: faqItems },
+                { upsert: true, new: true }
+            );
         }
-        if(type==="Categories"){
-            const{categories} = req.body;
-            const categoriesData= await LayoutModel.findOne({type:"Categories"})
-            const categoriesItems = await Promise.all(
-                categories.map(async(item:any)=>{
-                    return{
-                        question: item.question,
-                        answer: item.answer
-                }
-                })
-            )
-            await LayoutModel.findByIdAndUpdate(categoriesData?._id,{type:"Categories", categories: categoriesItems})
+
+        if (type === "Categories") {
+            const { categories } = req.body;
+            let categoriesData = await LayoutModel.findOne({ type: "Categories" });
+
+            if (!categoriesData) {
+                // Create a new Categories layout if none exists
+                categoriesData = await LayoutModel.create({ type: "Categories", categories: [] });
+            }
+
+            const categoriesItems = categories.map((item: any) => ({
+                title: item.title,
+            }));
+
+            await LayoutModel.findByIdAndUpdate(
+                categoriesData._id,
+                { type: "Categories", categories: categoriesItems },
+                { upsert: true, new: true }
+            );
         }
+
         res.status(200).json({
-            success:true,
-            message:"Layout Update Succesfully"
-        })
-    } catch (error:any) {
-        return next(new ErrorHandler(error.message,500))
-        
+            success: true,
+            message: "Layout updated successfully",
+        });
+    } catch (error: any) {
+        return next(new ErrorHandler(error.message, 500));
     }
-})
+});
+
+
 
 export const getLayoutByType = CatchAsyncError(async(req:Request, res:Response, next:NextFunction)=>{ 
     try {
